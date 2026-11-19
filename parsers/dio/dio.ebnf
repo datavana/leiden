@@ -4,7 +4,6 @@
 #
 #######################################################################
 
-
 #
 #  EBNF-Directives ----
 
@@ -21,19 +20,31 @@
 # Container Grammar ----
 #
 
-sco            = prettyspace `<sco>` prettyspace sec+ `</sco>` prettyspace §EOF
-sec            = `<sec>` prettyspace ( snt | snr )* par* `</sec>` prettyspace
+#
+# Container Grammar ----
+#
 
-snr            = `<snr>` /[A-Z0-9]+/ "."? letters_cross? prettyspace `</snr>` prettyspace
+document       = sco+ §EOF
+
+sco            = prettyspace `<sco>` prettyspace sec+ `</sco>` prettyspace translation?
+sec            = `<sec>` prettyspace ( snt | snr )* ( par translation? )* `</sec>` prettyspace
+
+#snr            = `<snr>` /[A-Z0-9]+/ "."? letters_cross? prettyspace `</snr>` prettyspace
+#snr         = `<snr>` /[^<]+/ `</snr>` prettyspace
+snr         = `<snr>` ( prettyspace span_txt prettyspace | /[^<]+/ ) `</snr>` prettyspace
+
 
 #snt         = `<snt>` prettyspace /(?:(?!<\/snt>)[\w .:,;()<>\/])+/ prettyspace `</snt>` prettyspace
-snt            = `<snt>` (b | /[^<]+/) `</snt>` prettyspace
-b              = prettyspace `<b>` /[^<]+/ `</b>` prettyspace
+snt            = `<snt>` (prettyspace (b | span_txt) prettyspace | /[^<]+/) `</snt>` prettyspace
 
-par            = `<par>` prettyspace (lno | lin | table)+ `</par>` prettyspace
+b              = `<b>` ( prettyspace versal prettyspace | /[^<]+/ ) `</b>`
+
+par            = `<par>` prettyspace (lno | lin | lce | table)+ `</par>` prettyspace
 
 lno            = `<lno>` cnt? § inscription `</lno>` prettyspace
 lin            = `<lin>` cnt? § inscription `</lin>` prettyspace
+lce            = `<lce>` § inscription `</lce>` prettyspace
+
 cnt            = `<cnt>` /[0-9]+/ `</cnt>`
 
 table  = `<table>` prettyspace row+ `</table>` prettyspace
@@ -41,18 +52,23 @@ row    = `<row>` prettyspace cell+ `</row>` prettyspace
 cell   = `<cell>` prettyspace entry+ `</cell>` prettyspace
 entry  = `<entry>` § inscription `</entry>` prettyspace
 
+translation    = `<translation>` prettyspace /[^<]+/ `</translation>` prettyspace
+
 #
 # Transcription Grammar ----
 #
 
 HIDE:inscription = ( inline | brackets )+
-HIDE:inline  = tags | insec | letters | terminator | binder | separator | space
+HIDE:inline  = tags | insec | letters | terminator | binder | separator | ampersand | bidi | space
+
 
 #
 # Tags ----
 #
 
-HIDE:tags   = app | all | em | chr | sup | sub | nl
+#HIDE:tags   = app | all | em | chr | sup | sub | nl
+HIDE:tags   = app | all | em | chr | sup | sub | tab | nl | b | versal | span | u
+
 
 HIDE:app    = appalpha | appnum
 appalpha    = `<appalpha id=` app_id `>` app_nr `</appalpha>`
@@ -63,8 +79,26 @@ app_nr      = /[^<]*/
 all         = `<lig>` (letters | brackets | space)+ `</lig>`
 em          = `<em>` letters space? `</em>`
 chr         = `<chr>` letters space? `</chr>`
-sup         = `<sup>` letters space? `</sup>`
+sup         = `<sup>` /[^<]+/ `</sup>`
+
+versal      = `<versal>` /[^<]+/ `</versal>`
+
+span        = `<span` attribute* `>` span_content+ `</span>`
+HIDE:span_content = inline | brackets | stray_bracket
+HIDE:stray_bracket = /[\[\]()]/
+
+span_txt    = `<span` attribute* `>` /[^<]+/ `</span>`
+
+attribute   = ~ attr_name `=` `"` attr_value `"`
+attr_name   = /[\w:-]+/
+attr_value  = /[^"<>]*/
+
+u           = `<u>` inscription `</u>`
+
 sub         = `<sub>` letters space? `</sub>`
+
+tab          = `<tab>` ( app | span | insec | letters | terminator | binder | separator | space | brackets )+ `</tab>`
+
 nl          = `<nl></nl>` | `<nl/>`
 
 #
@@ -85,13 +119,17 @@ HIDE:insec_separator = wtr / ?(\u0323)/ ~
 
 letters = letters_range | letters_sequence
 
-HIDE:letters_sequence         = letters_plain | letters_extended | letters_diacrytic | letters_cross | letters_apostrophe
+HIDE:letters_sequence         = letters_plain | letters_extended | letters_hebrew | letters_greek | letters_diacrytic | letters_cross | letters_apostrophe | letters_brackets
 HIDE:letters_range       = letters_sequence "-" letters_sequence
 HIDE:letters_plain       = /[A-Za-z0-9](?!\u0323)/+
 HIDE:letters_extended    = /[àèìòùÀÈÌÒÙáéíóúýÁÉÍÓÚÝâêîôûÂÊÎÔÛãñõÃÑÕäëïöüÿÄËÏÖÜŸçÇßØøÅåÆæœ](?!\u0323)/+
+HIDE:letters_hebrew = /[\u0591-\u05C7\u05D0-\u05EA\u05EF-\u05F4\uFB1D-\uFB36\uFB38-\uFB3C\uFB3E\uFB40\uFB41\uFB43\uFB44\uFB46-\uFB4F](?!\u0323)/+
 HIDE:letters_diacrytic   = /[A-Za-z]̈(?!\u0323)/+
 HIDE:letters_cross       = /[+†]/
+HIDE:letters_greek       = /[\u0370-\u0386\u0388-\u03FF\u1F00-\u1FFF](?!\u0323)/+
 HIDE:letters_apostrophe  =  "'"
+
+HIDE:letters_brackets  =  /[〈 〉]/
 
 #
 # Terminators ----
@@ -116,8 +154,12 @@ HIDE:separator   = z | wtr
 
 wtr = sep_word_dot |  sep_word_period | sep_word_comma | sep_word_colon | sep_word_equal
 
+ampersand    = /&amp;/ | /&(?!(?:lt|gt);)/
+
+
 # Moved to attribute value in AST
-sep_word_dot           = ~"·"~
+
+sep_word_dot           = ~"·"~ | ~"·"~ | ~"∙"~
 sep_word_period        = ~"."~ #
 sep_word_colon         = ~":"~
 sep_word_comma         = ~","~
@@ -152,6 +194,7 @@ HIDE:known           = "."+
 #
 
 space        = /\s/~ ! separator
-DROP:prettyspace  = /[\r\n ]*/
+DROP:prettyspace  = /[\r\n ]*/ | /[\n ]*/
 DROP:EOF    =  !/./
 
+HIDE:bidi    = /[\u200E\u200F\u061C\u202A-\u202E\u2066-\u2069]+/

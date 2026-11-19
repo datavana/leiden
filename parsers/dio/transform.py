@@ -28,6 +28,7 @@ DIO_ROOT = PROJECT_ROOT / "parsers" / "dio"
 import pandas as pd
 import parsers.dio.dioParser as dioParser
 from tqdm import tqdm
+import re
 
 import importlib
 importlib.reload(dioParser)
@@ -41,7 +42,9 @@ df['case'] = range(1, len(df) + 1)
 #%% Preprocess
 regs = pd.read_csv(DIO_ROOT / "preprocess.csv", delimiter = ';', keep_default_na=False)
 for idx, row in regs.iterrows():
-    df['content'] =  df['content'].str.replace(row['search'], row['replace'], regex=True) # , flags = re.MULTILINE
+    #df['content'] =  df['content'].str.replace(row['search'], row['replace'], regex=True) # , flags = re.MULTILINE
+    pattern = re.compile(row['search'])
+    df['content'] = df['content'].apply(lambda x: pattern.sub(row['replace'], x) if isinstance(x, str) else x)
 
 #%% Save test cases for dio sco
 
@@ -53,7 +56,8 @@ for idx, row in df.iterrows():
 
 outputname = Path(filename).stem
 with open(DIO_ROOT / "tests" / f"{outputname}.ini", "w", encoding="utf-8") as file:
-    file.write("[match:sco]\n" + tests)
+    #file.write("[match:sco]\n" + tests)
+    file.write("[match:document]\n" + tests)
 
 #%% Build parser
 
@@ -71,13 +75,14 @@ for idx, row in tqdm(df.iterrows()):
         result, errors = dioParser.compile_snippet(source)
         strings = ["letters", "terminator", "space", "binder"]
         # TODO: do we need to list all those tags?
-        inline =  ["lno","lin","snt","snr","wtr", "z", "abr","del","cpl","add","insec","lig","b","strong","em","chr","sup","sub","nl","appalpha","appnum"]
+        inline =  ["lno","lin","snt","snr","wtr", "z", "abr","del","cpl","add","insec","lig","b","strong","em","chr","sup","sub","nl","appalpha","appnum","tab","translation"], # some tags added to the EBNF still missing here ...
         df.loc[idx,'parsed'] = result.as_xml(string_tags= strings, inline_tags = inline, indentation=2)
     except Exception as e:
         df.loc[idx, 'error'] = str(e)
 
 # How many are well-formed?
-df['ok'] = df['parsed'].str.startswith("<sco>")
+#df['ok'] = df['parsed'].str.startswith("<sco>")
+df['ok'] = df['parsed'].str.startswith("<document>")
 print(df['ok'].value_counts())
 
 #%% Save result
